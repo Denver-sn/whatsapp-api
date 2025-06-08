@@ -18,11 +18,13 @@ Un chatbot WhatsApp développé avec NestJS et intégré à l'API officielle de 
 ## 🛠️ Installation
 
 1. **Cloner le projet et installer les dépendances:**
+
 ```bash
 npm install
 ```
 
 2. **Configurer les variables d'environnement:**
+
 ```bash
 cp .env.example .env
 ```
@@ -63,11 +65,13 @@ URL du webhook: `https://votre-domaine.com/webhook/whatsapp`
 ## 🚀 Démarrage
 
 ### Mode développement
+
 ```bash
 npm run start:dev
 ```
 
 ### Mode production
+
 ```bash
 npm run build
 npm run start:prod
@@ -83,16 +87,19 @@ Une fois l'application démarrée, la documentation Swagger est disponible sur:
 ## 🔄 Endpoints principaux
 
 ### Santé de l'application
+
 - `GET /` - Message de bienvenue
 - `GET /health` - Statut de l'application
 
 ### Messages WhatsApp
+
 - `POST /whatsapp/send` - Envoyer un message (flexible)
 - `POST /whatsapp/send/text` - Envoyer un message texte
 - `POST /whatsapp/send/template` - Envoyer un message template
 - `GET /whatsapp/test/:phoneNumber` - Envoyer un message de test
 
 ### Webhook
+
 - `GET /webhook/whatsapp` - Vérification du webhook
 - `POST /webhook/whatsapp` - Réception des messages entrants
 - `GET /webhook/test` - Test du webhook
@@ -100,6 +107,7 @@ Une fois l'application démarrée, la documentation Swagger est disponible sur:
 ## 📤 Exemples d'utilisation
 
 ### Envoyer un message texte
+
 ```bash
 curl -X POST http://localhost:3000/whatsapp/send/text \
   -H "Content-Type: application/json" \
@@ -110,6 +118,7 @@ curl -X POST http://localhost:3000/whatsapp/send/text \
 ```
 
 ### Envoyer un message template
+
 ```bash
 curl -X POST http://localhost:3000/whatsapp/send/template \
   -H "Content-Type: application/json" \
@@ -121,6 +130,7 @@ curl -X POST http://localhost:3000/whatsapp/send/template \
 ```
 
 ### Test rapide
+
 ```bash
 curl http://localhost:3000/whatsapp/test/33123456789
 ```
@@ -164,6 +174,7 @@ src/
 ## 📝 Logs
 
 Le système de logging capture:
+
 - Toutes les requêtes HTTP (entrée/sortie)
 - Messages WhatsApp envoyés/reçus
 - Erreurs avec stack traces
@@ -172,23 +183,16 @@ Le système de logging capture:
 ## 🔄 Fonctionnalités du chatbot
 
 Le chatbot inclut une réponse automatique de base qui:
+
 - Accueille l'utilisateur par son nom
 - Confirme la réception du message
 - Propose de l'aide
 
 Vous pouvez personnaliser la logique dans `WhatsappService.handleIncomingMessage()`.
 
-## 🚀 Prochaines étapes
-
-- [ ] Ajouter une base de données pour stocker les conversations
-- [ ] Implémenter des flux de conversation plus complexes
-- [ ] Ajouter le support des médias (images, documents, audio)
-- [ ] Intégrer une IA pour des réponses intelligentes
-- [ ] Ajouter des métriques et monitoring
-- [ ] Tests unitaires et d'intégration
-
 ## 📞 Support
 
 Pour toute question ou problème, consultez la documentation officielle:
+
 - [WhatsApp Business API](https://developers.facebook.com/docs/whatsapp)
 - [NestJS Documentation](https://nestjs.com/)
