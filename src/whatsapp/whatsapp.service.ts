@@ -34,20 +34,16 @@ export class WhatsappService {
     private readonly conversationsService: ConversationsService,
     private readonly webhooksService: WebhooksService
   ) {
-    this.accessToken = this.configService.get<string>("WHATSAPP_ACCESS_TOKEN");
-    this.phoneNumberId = this.configService.get<string>(
+    this.accessToken = this.configService.getOrThrow<string>("WHATSAPP_ACCESS_TOKEN");
+    this.phoneNumberId = this.configService.getOrThrow<string>(
       "WHATSAPP_PHONE_NUMBER_ID"
     );
-    const apiVersion = this.configService.get<string>(
+    const apiVersion = this.configService.getOrThrow<string>(
       "WHATSAPP_API_VERSION",
       "v18.0"
     );
 
     this.baseUrl = `https://graph.facebook.com/${apiVersion}/${this.phoneNumberId}`;
-
-    if (!this.accessToken || !this.phoneNumberId) {
-      throw new Error("WhatsApp configuration is missing");
-    }
 
     this.logger.log("WhatsApp service initialized");
   }
