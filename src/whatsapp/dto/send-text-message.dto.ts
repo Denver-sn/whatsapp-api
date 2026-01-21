@@ -8,7 +8,7 @@ export class SendTextMessageDto {
   })
   @IsString()
   @IsNotEmpty()
-  to: string;
+  to!: string;
 
   @ApiProperty({
     description: 'Text message content',
@@ -16,5 +16,5 @@ export class SendTextMessageDto {
   })
   @IsString()
   @IsNotEmpty()
-  text: string;
+  text!: string;
 }

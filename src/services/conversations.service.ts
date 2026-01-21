@@ -1,6 +1,6 @@
 import { Injectable, Logger, Inject, forwardRef } from "@nestjs/common";
 import { InjectModel } from "@nestjs/mongoose";
-import { Model } from "mongoose";
+import { Model, FilterQuery } from "mongoose";
 import {
   Conversation,
   ConversationDocument,
@@ -8,6 +8,7 @@ import {
 } from "../schemas/conversation.schema";
 import type { ConversationResponse } from "../models/conversation.model";
 import { WhatsappService } from "../whatsapp/whatsapp.service";
+import { PaginationQueryDto, PaginatedResult } from "../common/dto/pagination.dto";
 
 @Injectable()
 export class ConversationsService {
@@ -28,6 +29,53 @@ export class ConversationsService {
       lastMessage: conversation.lastMessage,
       unreadCount: conversation.unreadCount,
     }));
+  }
+
+  async findAllPaginated(
+    paginationQuery: PaginationQueryDto
+  ): Promise<PaginatedResult<ConversationResponse>> {
+    const { page = 1, limit = 20, search } = paginationQuery;
+    const skip = (page - 1) * limit;
+
+    // Build filter query
+    const filter: FilterQuery<ConversationDocument> = {};
+    if (search) {
+      filter.$or = [
+        { "contact.name": { $regex: search, $options: "i" } },
+        { "contact.phoneNumber": { $regex: search, $options: "i" } },
+      ];
+    }
+
+    // Execute queries in parallel for better performance
+    const [conversations, total] = await Promise.all([
+      this.conversationModel
+        .find(filter)
+        .sort({ "lastMessage.timestamp": -1 }) // Most recent first
+        .skip(skip)
+        .limit(limit)
+        .lean()
+        .exec(),
+      this.conversationModel.countDocuments(filter).exec(),
+    ]);
+
+    const totalPages = Math.ceil(total / limit);
+
+    return {
+      data: conversations.map((conversation) => ({
+        id: conversation._id?.toString() || "",
+        contact: conversation.contact,
+        lastMessage: conversation.lastMessage,
+        unreadCount: conversation.unreadCount,
+      })),
+      meta: {
+        total,
+        page,
+        limit,
+        totalPages,
+        hasNextPage: page < totalPages,
+        hasPreviousPage: page > 1,
+      },
+    };
   }
 
   async findById(id: string): Promise<ConversationDocument | null> {
@@ -107,9 +155,10 @@ export class ConversationsService {
       );
       return savedConversation;
     } catch (error) {
+      const err = error as Error;
       this.logger.error(
-        `Erreur lors de la création/mise à jour de la conversation: ${error.message}`,
-        error.stack
+        `Erreur lors de la création/mise à jour de la conversation: ${err.message}`,
+        err.stack
       );
       throw error;
     }
@@ -140,9 +189,10 @@ export class ConversationsService {
         );
         this.logger.log("Message WhatsApp envoyé avec succès");
       } catch (error) {
+        const err = error as Error;
         this.logger.error(
-          `Erreur lors de l'envoi du message WhatsApp: ${error.message}`,
-          error.stack
+          `Erreur lors de l'envoi du message WhatsApp: ${err.message}`,
+          err.stack
         );
       }
     }

@@ -1,8 +1,9 @@
 import { Injectable } from "@nestjs/common";
 import { InjectModel } from "@nestjs/mongoose";
-import { Model } from "mongoose";
-import { Conversation } from "../schemas/conversation.schema";
+import { Model, FilterQuery } from "mongoose";
+import { Conversation, ConversationDocument } from "../schemas/conversation.schema";
 import { EventsGateway } from "../websockets/events.gateway";
+import { PaginationQueryDto, PaginatedResult } from "../common/dto/pagination.dto";
 
 @Injectable()
 export class ConversationsService {
@@ -29,6 +30,64 @@ export class ConversationsService {
     });
 
     return conversationsWithTimestamps;
+  }
+
+  async findAllPaginated(
+    paginationQuery: PaginationQueryDto
+  ): Promise<PaginatedResult<any>> {
+    const { page = 1, limit = 20, search } = paginationQuery;
+    const skip = (page - 1) * limit;
+
+    // Build filter query
+    const filter: FilterQuery<ConversationDocument> = {};
+    if (search) {
+      filter.$or = [
+        { "contact.name": { $regex: search, $options: "i" } },
+        { "contact.phoneNumber": { $regex: search, $options: "i" } },
+      ];
+    }
+
+    // Execute queries in parallel for better performance
+    const [conversations, total] = await Promise.all([
+      this.conversationModel
+        .find(filter)
+        .sort({ updatedAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .lean()
+        .exec(),
+      this.conversationModel.countDocuments(filter).exec(),
+    ]);
+
+    const totalPages = Math.ceil(total / limit);
+
+    // Ensure all conversations have proper timestamps
+    const now = new Date();
+    const data = conversations.map((conversation) => {
+      if (!conversation.updatedAt) {
+        conversation.updatedAt = conversation.createdAt || now;
+      }
+      return {
+        id: conversation._id?.toString() || "",
+        contact: conversation.contact,
+        lastMessage: conversation.lastMessage,
+        unreadCount: conversation.unreadCount,
+        createdAt: conversation.createdAt,
+        updatedAt: conversation.updatedAt,
+      };
+    });
+
+    return {
+      data,
+      meta: {
+        total,
+        page,
+        limit,
+        totalPages,
+        hasNextPage: page < totalPages,
+        hasPreviousPage: page > 1,
+      },
+    };
   }
 
   async findById(id: string) {

@@ -8,7 +8,7 @@ export class CreateConversationDto {
   })
   @IsString()
   @IsNotEmpty()
-  recipientPhone: string;
+  recipientPhone!: string;
 
   @ApiProperty({
     description: "Nom de l'agent",
@@ -16,7 +16,7 @@ export class CreateConversationDto {
   })
   @IsString()
   @IsNotEmpty()
-  agentName: string;
+  agentName!: string;
 
   @ApiProperty({
     description: "Contexte de la conversation",
@@ -24,7 +24,7 @@ export class CreateConversationDto {
   })
   @IsString()
   @IsNotEmpty()
-  context: string;
+  context!: string;
 }
 
 export class ContactDto {
@@ -32,13 +32,13 @@ export class ContactDto {
     description: "Nom du contact",
     example: "John Doe",
   })
-  name: string;
+  name!: string;
 
   @ApiProperty({
     description: "Numéro de téléphone",
     example: "+221777460452",
   })
-  phoneNumber: string;
+  phoneNumber!: string;
 
   @ApiProperty({
     description: "URL de la photo de profil",
@@ -55,7 +55,7 @@ export class MessageDto {
   })
   @IsString()
   @IsNotEmpty()
-  content: string;
+  content!: string;
 
   @ApiProperty({
     description: "Horodatage du message",
@@ -63,7 +63,7 @@ export class MessageDto {
   })
   @IsISO8601()
   @IsNotEmpty()
-  timestamp: string;
+  timestamp!: string;
 
   @ApiProperty({
     description: "Direction du message",
@@ -72,7 +72,7 @@ export class MessageDto {
   })
   @IsEnum(["incoming", "outgoing"])
   @IsNotEmpty()
-  direction: "incoming" | "outgoing";
+  direction!: "incoming" | "outgoing";
 }
 
 export class ConversationResponse {
@@ -80,24 +80,24 @@ export class ConversationResponse {
     description: "ID unique de la conversation",
     example: "507f1f77bcf86cd799439011",
   })
-  id: string;
+  id!: string;
 
   @ApiProperty({
     description: "Informations sur le contact",
     type: () => ContactDto,
   })
-  contact: ContactDto;
+  contact!: ContactDto;
 
   @ApiProperty({
     description: "Dernier message de la conversation",
     type: () => MessageDto,
   })
-  lastMessage: MessageDto;
+  lastMessage!: MessageDto;
 
   @ApiProperty({
     description: "Nombre de messages non lus",
     example: 2,
     minimum: 0,
   })
-  unreadCount: number;
+  unreadCount!: number;
 }

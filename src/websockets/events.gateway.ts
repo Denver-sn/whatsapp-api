@@ -14,7 +14,7 @@ import { Logger } from "@nestjs/common";
   },
 })
 export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
-  @WebSocketServer() server: Server;
+  @WebSocketServer() server!: Server;
   private logger: Logger = new Logger("EventsGateway");
   private clients: Map<string, Socket> = new Map();
 
@@ -63,5 +63,47 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
   // Méthode pour émettre des mises à jour de la liste des conversations
   emitConversationsListUpdate(data: any) {
     this.server.emit("conversationsListUpdate", data);
+  }
+
+  // Subscribe to message status updates for a specific phone
+  @SubscribeMessage("subscribeMessageStatus")
+  handleSubscribeMessageStatus(client: Socket, phoneNumber: string) {
+    client.join(`status-${phoneNumber}`);
+    this.logger.log(
+      `Client ${client.id} subscribed to status updates for: ${phoneNumber}`
+    );
+  }
+
+  // Unsubscribe from message status updates
+  @SubscribeMessage("unsubscribeMessageStatus")
+  handleUnsubscribeMessageStatus(client: Socket, phoneNumber: string) {
+    client.leave(`status-${phoneNumber}`);
+    this.logger.log(
+      `Client ${client.id} unsubscribed from status updates for: ${phoneNumber}`
+    );
+  }
+
+  // Emit message status update
+  emitMessageStatusUpdate(data: {
+    messageId: string;
+    recipientPhone: string;
+    conversationId?: string;
+    status: string;
+    timestamp: Date;
+    errorCode?: string;
+    errorMessage?: string;
+  }) {
+    // Emit to specific phone subscriber
+    this.server.to(`status-${data.recipientPhone}`).emit("messageStatusUpdate", data);
+
+    // Also emit to conversation room if available
+    if (data.conversationId) {
+      this.server
+        .to(`conversation-${data.conversationId}`)
+        .emit("messageStatusUpdate", data);
+    }
+
+    // Emit global event for dashboards
+    this.server.emit("messageStatusChanged", data);
   }
 }

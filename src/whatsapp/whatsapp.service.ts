@@ -13,8 +13,18 @@ import { firstValueFrom } from "rxjs";
 import { AxiosResponse } from "axios";
 import { SendMessageDto, MessageType } from "./dto/send-message.dto";
 import {
+  SendMediaMessageDto,
+  MediaType,
+} from "./dto/send-media-message.dto";
+import {
+  SendReplyButtonsDto,
+  SendListMessageDto,
+  SendCtaButtonDto,
+} from "./dto/send-interactive-message.dto";
+import {
   WhatsappApiResponse,
   WhatsappMessage,
+  MediaPayload,
 } from "./interfaces/whatsapp.interface";
 import { ConversationsService } from "../services/conversations.service";
 import { WebhooksService } from "../services/webhooks.service";
@@ -25,7 +35,6 @@ export class WhatsappService {
   private readonly baseUrl: string;
   private readonly accessToken: string;
   private readonly phoneNumberId: string;
-  private readonly apiUrl: string;
 
   constructor(
     private readonly configService: ConfigService,
@@ -81,14 +90,15 @@ export class WhatsappService {
 
       this.logger.log(`Message sent successfully to ${to}`);
       return response.data;
-    } catch (error) {
+    } catch (error: unknown) {
+      const err = error as Error & { response?: { status: number; data: { error?: { message?: string } } }; stack?: string };
       this.logger.error(
-        `Failed to send message: ${error.message}`,
-        error.stack
+        `Failed to send message: ${err.message}`,
+        err.stack
       );
 
-      if (error.response) {
-        const { status, data } = error.response;
+      if (err.response) {
+        const { status, data } = err.response;
         throw new HttpException(
           `WhatsApp API Error: ${data.error?.message || "Unknown error"}`,
           status
@@ -113,10 +123,174 @@ export class WhatsappService {
     });
   }
 
+  /**
+   * Send a media message (image, video, audio, document, sticker)
+   */
+  async sendMediaMessage(
+    dto: SendMediaMessageDto
+  ): Promise<WhatsappApiResponse> {
+    try {
+      const { to, mediaType, url, mediaId, caption, filename } = dto;
+
+      // Build media payload
+      const mediaPayload: MediaPayload = {};
+      if (url) {
+        mediaPayload.link = url;
+      } else if (mediaId) {
+        mediaPayload.id = mediaId;
+      } else {
+        throw new HttpException(
+          "Either url or mediaId must be provided",
+          HttpStatus.BAD_REQUEST
+        );
+      }
+
+      // Add caption (not supported for audio and sticker)
+      if (caption && mediaType !== MediaType.AUDIO && mediaType !== MediaType.STICKER) {
+        mediaPayload.caption = caption;
+      }
+
+      // Add filename (only for documents)
+      if (filename && mediaType === MediaType.DOCUMENT) {
+        mediaPayload.filename = filename;
+      }
+
+      const payload = {
+        messaging_product: "whatsapp",
+        to,
+        type: mediaType,
+        [mediaType]: mediaPayload,
+      };
+
+      this.logger.debug(`Sending ${mediaType} to ${to}: ${JSON.stringify(payload)}`);
+
+      const response: AxiosResponse<WhatsappApiResponse> = await firstValueFrom(
+        this.httpService.post(`${this.baseUrl}/messages`, payload, {
+          headers: {
+            Authorization: `Bearer ${this.accessToken}`,
+            "Content-Type": "application/json",
+          },
+        })
+      );
+
+      // Save outgoing webhook
+      await this.webhooksService.addWebhook(`${mediaType}_sent`, {
+        ...payload,
+        status: "sent",
+        timestamp: new Date().toISOString(),
+      });
+
+      this.logger.log(`${mediaType} sent successfully to ${to}`);
+      return response.data;
+    } catch (error: unknown) {
+      const err = error as Error & { response?: { status: number; data: { error?: { message?: string } } }; stack?: string };
+      this.logger.error(
+        `Failed to send ${dto.mediaType}: ${err.message}`,
+        err.stack
+      );
+
+      if (err.response) {
+        const { status, data } = err.response;
+        throw new HttpException(
+          `WhatsApp API Error: ${data.error?.message || "Unknown error"}`,
+          status
+        );
+      }
+
+      throw new HttpException(
+        `Failed to send WhatsApp ${dto.mediaType}`,
+        HttpStatus.INTERNAL_SERVER_ERROR
+      );
+    }
+  }
+
+  /**
+   * Send an image message
+   */
+  async sendImageMessage(
+    to: string,
+    urlOrMediaId: string,
+    caption?: string,
+    isMediaId: boolean = false
+  ): Promise<WhatsappApiResponse> {
+    return this.sendMediaMessage({
+      to,
+      mediaType: MediaType.IMAGE,
+      ...(isMediaId ? { mediaId: urlOrMediaId } : { url: urlOrMediaId }),
+      caption,
+    });
+  }
+
+  /**
+   * Send a video message
+   */
+  async sendVideoMessage(
+    to: string,
+    urlOrMediaId: string,
+    caption?: string,
+    isMediaId: boolean = false
+  ): Promise<WhatsappApiResponse> {
+    return this.sendMediaMessage({
+      to,
+      mediaType: MediaType.VIDEO,
+      ...(isMediaId ? { mediaId: urlOrMediaId } : { url: urlOrMediaId }),
+      caption,
+    });
+  }
+
+  /**
+   * Send an audio message
+   */
+  async sendAudioMessage(
+    to: string,
+    urlOrMediaId: string,
+    isMediaId: boolean = false
+  ): Promise<WhatsappApiResponse> {
+    return this.sendMediaMessage({
+      to,
+      mediaType: MediaType.AUDIO,
+      ...(isMediaId ? { mediaId: urlOrMediaId } : { url: urlOrMediaId }),
+    });
+  }
+
+  /**
+   * Send a document message
+   */
+  async sendDocumentMessage(
+    to: string,
+    urlOrMediaId: string,
+    caption?: string,
+    filename?: string,
+    isMediaId: boolean = false
+  ): Promise<WhatsappApiResponse> {
+    return this.sendMediaMessage({
+      to,
+      mediaType: MediaType.DOCUMENT,
+      ...(isMediaId ? { mediaId: urlOrMediaId } : { url: urlOrMediaId }),
+      caption,
+      filename,
+    });
+  }
+
+  /**
+   * Send a sticker message
+   */
+  async sendStickerMessage(
+    to: string,
+    urlOrMediaId: string,
+    isMediaId: boolean = false
+  ): Promise<WhatsappApiResponse> {
+    return this.sendMediaMessage({
+      to,
+      mediaType: MediaType.STICKER,
+      ...(isMediaId ? { mediaId: urlOrMediaId } : { url: urlOrMediaId }),
+    });
+  }
+
   async sendTemplateMessage(
     to: string,
     templateName: string,
-    languageCode: string = "en",
+    _languageCode: string = "en",
     components?: any[]
   ): Promise<WhatsappApiResponse> {
     try {
@@ -164,10 +338,11 @@ export class WhatsappService {
 
       this.logger.log(`Template message sent successfully to ${to}`);
       return response.data;
-    } catch (error) {
+    } catch (error: unknown) {
+      const err = error as Error & { stack?: string };
       this.logger.error(
-        `Failed to send template message: ${error.message}`,
-        error.stack
+        `Failed to send template message: ${err.message}`,
+        err.stack
       );
       throw new HttpException(
         "Failed to send WhatsApp template message",
@@ -248,14 +423,15 @@ export class WhatsappService {
 
       this.logger.log(`OTP message sent successfully to ${to}`);
       return response.data;
-    } catch (error) {
+    } catch (error: unknown) {
+      const err = error as Error & { response?: { status: number; data: { error?: { message?: string } } }; stack?: string };
       this.logger.error(
-        `Failed to send OTP message: ${error.message}`,
-        error.stack
+        `Failed to send OTP message: ${err.message}`,
+        err.stack
       );
 
-      if (error.response) {
-        const { status, data } = error.response;
+      if (err.response) {
+        const { status, data } = err.response;
         this.logger.error(
           `API Error Response: ${JSON.stringify(data, null, 2)}`
         );
@@ -286,26 +462,87 @@ export class WhatsappService {
       const message = value.messages[0];
       const contact = value.contacts?.[0];
 
+      // Extract text based on message type
+      let text = "";
+      let media = undefined;
+
+      switch (message.type) {
+        case "text":
+          text = message.text?.body || "";
+          break;
+        case "image":
+          text = message.image?.caption || "[Image]";
+          media = {
+            id: message.image?.id,
+            mimeType: message.image?.mime_type,
+            sha256: message.image?.sha256,
+            caption: message.image?.caption,
+          };
+          break;
+        case "video":
+          text = message.video?.caption || "[Video]";
+          media = {
+            id: message.video?.id,
+            mimeType: message.video?.mime_type,
+            sha256: message.video?.sha256,
+            caption: message.video?.caption,
+          };
+          break;
+        case "audio":
+          text = "[Audio]";
+          media = {
+            id: message.audio?.id,
+            mimeType: message.audio?.mime_type,
+            sha256: message.audio?.sha256,
+          };
+          break;
+        case "document":
+          text = message.document?.caption || `[Document: ${message.document?.filename || "file"}]`;
+          media = {
+            id: message.document?.id,
+            mimeType: message.document?.mime_type,
+            sha256: message.document?.sha256,
+            filename: message.document?.filename,
+            caption: message.document?.caption,
+          };
+          break;
+        case "sticker":
+          text = "[Sticker]";
+          media = {
+            id: message.sticker?.id,
+            mimeType: message.sticker?.mime_type,
+            sha256: message.sticker?.sha256,
+          };
+          break;
+        case "location":
+          text = `[Location: ${message.location?.name || ""} ${message.location?.address || ""}]`.trim();
+          break;
+        default:
+          text = `[${message.type}]`;
+      }
+
       const processedMessage: WhatsappMessage = {
         id: message.id,
         from: message.from,
         timestamp: message.timestamp,
         type: message.type,
-        text: message.text?.body || "",
+        text,
         contact: {
           name: contact?.profile?.name || "Unknown",
           wa_id: contact?.wa_id || message.from,
         },
+        ...(media && { media }),
       };
 
       this.logger.log(
-        `Received message from ${processedMessage.from}: ${processedMessage.text}`
+        `Received ${message.type} message from ${processedMessage.from}: ${processedMessage.text}`
       );
       return processedMessage;
-    } catch (error) {
+    } catch (error: unknown) {
+      const err = error as Error & { stack?: string };
       this.logger.error(
-        `Failed to process incoming message: ${error.message}`,
-        error.stack
+        `Failed to process incoming message: ${err.message}`,
+        err.stack
       );
       return null;
     }
@@ -363,10 +600,11 @@ export class WhatsappService {
       });
 
       this.logger.log(`Auto-response sent to ${message.from}`);
-    } catch (error) {
+    } catch (error: unknown) {
+      const err = error as Error & { stack?: string };
       this.logger.error(
-        `Failed to handle incoming message: ${error.message}`,
-        error.stack
+        `Failed to handle incoming message: ${err.message}`,
+        err.stack
       );
     }
   }
@@ -429,22 +667,260 @@ export class WhatsappService {
       this.logger.debug("WhatsApp API response:", response.data);
 
       return response.data;
-    } catch (error) {
+    } catch (error: unknown) {
+      const err = error as Error & { response?: { status: number; data: { error?: { message?: string } } }; stack?: string };
       this.logger.error(
-        `Erreur lors de l'envoi du template à ${to}: ${error.message}`,
-        error.response?.data || error.stack
+        `Erreur lors de l'envoi du template à ${to}: ${err.message}`,
+        err.response?.data || err.stack
       );
 
-      if (error.response?.data) {
+      if (err.response?.data) {
         this.logger.error(
           "WhatsApp API error details:",
-          JSON.stringify(error.response.data, null, 2)
+          JSON.stringify(err.response.data, null, 2)
         );
       }
 
       throw new HttpException(
-        `Erreur lors de l'envoi du template WhatsApp: ${error.response?.data?.error?.message || error.message}`,
-        error.response?.status || HttpStatus.INTERNAL_SERVER_ERROR
+        `Erreur lors de l'envoi du template WhatsApp: ${err.response?.data?.error?.message || err.message}`,
+        err.response?.status || HttpStatus.INTERNAL_SERVER_ERROR
+      );
+    }
+  }
+
+  /**
+   * Send a reply buttons message (up to 3 buttons)
+   */
+  async sendReplyButtons(dto: SendReplyButtonsDto): Promise<WhatsappApiResponse> {
+    try {
+      const { to, body, header, footer, buttons } = dto;
+
+      const interactive: any = {
+        type: "button",
+        body: { text: body.text },
+        action: {
+          buttons: buttons.map((btn) => ({
+            type: "reply",
+            reply: {
+              id: btn.id,
+              title: btn.title,
+            },
+          })),
+        },
+      };
+
+      if (header) {
+        if (header.type === "text") {
+          interactive.header = { type: "text", text: header.text };
+        } else if (header.url) {
+          interactive.header = { type: header.type, [header.type]: { link: header.url } };
+        } else if (header.mediaId) {
+          interactive.header = { type: header.type, [header.type]: { id: header.mediaId } };
+        }
+      }
+
+      if (footer) {
+        interactive.footer = { text: footer.text };
+      }
+
+      const payload = {
+        messaging_product: "whatsapp",
+        recipient_type: "individual",
+        to,
+        type: "interactive",
+        interactive,
+      };
+
+      this.logger.debug(`Sending reply buttons to ${to}: ${JSON.stringify(payload)}`);
+
+      const response: AxiosResponse<WhatsappApiResponse> = await firstValueFrom(
+        this.httpService.post(`${this.baseUrl}/messages`, payload, {
+          headers: {
+            Authorization: `Bearer ${this.accessToken}`,
+            "Content-Type": "application/json",
+          },
+        })
+      );
+
+      await this.webhooksService.addWebhook("interactive_button_sent", {
+        ...payload,
+        status: "sent",
+        timestamp: new Date().toISOString(),
+      });
+
+      this.logger.log(`Reply buttons sent successfully to ${to}`);
+      return response.data;
+    } catch (error: unknown) {
+      const err = error as Error & { response?: { status: number; data: { error?: { message?: string } } }; stack?: string };
+      this.logger.error(`Failed to send reply buttons: ${err.message}`, err.stack);
+
+      if (err.response) {
+        const { status, data } = err.response;
+        throw new HttpException(
+          `WhatsApp API Error: ${data.error?.message || "Unknown error"}`,
+          status
+        );
+      }
+
+      throw new HttpException(
+        "Failed to send WhatsApp reply buttons",
+        HttpStatus.INTERNAL_SERVER_ERROR
+      );
+    }
+  }
+
+  /**
+   * Send a list message (up to 10 sections with rows)
+   */
+  async sendListMessage(dto: SendListMessageDto): Promise<WhatsappApiResponse> {
+    try {
+      const { to, body, header, footer, buttonText, sections } = dto;
+
+      const interactive: any = {
+        type: "list",
+        body: { text: body.text },
+        action: {
+          button: buttonText,
+          sections: sections.map((section) => ({
+            ...(section.title && { title: section.title }),
+            rows: section.rows.map((row) => ({
+              id: row.id,
+              title: row.title,
+              ...(row.description && { description: row.description }),
+            })),
+          })),
+        },
+      };
+
+      if (header && header.type === "text") {
+        interactive.header = { type: "text", text: header.text };
+      }
+
+      if (footer) {
+        interactive.footer = { text: footer.text };
+      }
+
+      const payload = {
+        messaging_product: "whatsapp",
+        recipient_type: "individual",
+        to,
+        type: "interactive",
+        interactive,
+      };
+
+      this.logger.debug(`Sending list message to ${to}: ${JSON.stringify(payload)}`);
+
+      const response: AxiosResponse<WhatsappApiResponse> = await firstValueFrom(
+        this.httpService.post(`${this.baseUrl}/messages`, payload, {
+          headers: {
+            Authorization: `Bearer ${this.accessToken}`,
+            "Content-Type": "application/json",
+          },
+        })
+      );
+
+      await this.webhooksService.addWebhook("interactive_list_sent", {
+        ...payload,
+        status: "sent",
+        timestamp: new Date().toISOString(),
+      });
+
+      this.logger.log(`List message sent successfully to ${to}`);
+      return response.data;
+    } catch (error: unknown) {
+      const err = error as Error & { response?: { status: number; data: { error?: { message?: string } } }; stack?: string };
+      this.logger.error(`Failed to send list message: ${err.message}`, err.stack);
+
+      if (err.response) {
+        const { status, data } = err.response;
+        throw new HttpException(
+          `WhatsApp API Error: ${data.error?.message || "Unknown error"}`,
+          status
+        );
+      }
+
+      throw new HttpException(
+        "Failed to send WhatsApp list message",
+        HttpStatus.INTERNAL_SERVER_ERROR
+      );
+    }
+  }
+
+  /**
+   * Send a CTA URL button message
+   */
+  async sendCtaButton(dto: SendCtaButtonDto): Promise<WhatsappApiResponse> {
+    try {
+      const { to, body, header, footer, button } = dto;
+
+      const interactive: any = {
+        type: "cta_url",
+        body: { text: body.text },
+        action: {
+          name: "cta_url",
+          parameters: {
+            display_text: button.displayText,
+            url: button.url,
+          },
+        },
+      };
+
+      if (header) {
+        if (header.type === "text") {
+          interactive.header = { type: "text", text: header.text };
+        } else if (header.url) {
+          interactive.header = { type: header.type, [header.type]: { link: header.url } };
+        } else if (header.mediaId) {
+          interactive.header = { type: header.type, [header.type]: { id: header.mediaId } };
+        }
+      }
+
+      if (footer) {
+        interactive.footer = { text: footer.text };
+      }
+
+      const payload = {
+        messaging_product: "whatsapp",
+        recipient_type: "individual",
+        to,
+        type: "interactive",
+        interactive,
+      };
+
+      this.logger.debug(`Sending CTA button to ${to}: ${JSON.stringify(payload)}`);
+
+      const response: AxiosResponse<WhatsappApiResponse> = await firstValueFrom(
+        this.httpService.post(`${this.baseUrl}/messages`, payload, {
+          headers: {
+            Authorization: `Bearer ${this.accessToken}`,
+            "Content-Type": "application/json",
+          },
+        })
+      );
+
+      await this.webhooksService.addWebhook("interactive_cta_sent", {
+        ...payload,
+        status: "sent",
+        timestamp: new Date().toISOString(),
+      });
+
+      this.logger.log(`CTA button sent successfully to ${to}`);
+      return response.data;
+    } catch (error: unknown) {
+      const err = error as Error & { response?: { status: number; data: { error?: { message?: string } } }; stack?: string };
+      this.logger.error(`Failed to send CTA button: ${err.message}`, err.stack);
+
+      if (err.response) {
+        const { status, data } = err.response;
+        throw new HttpException(
+          `WhatsApp API Error: ${data.error?.message || "Unknown error"}`,
+          status
+        );
+      }
+
+      throw new HttpException(
+        "Failed to send WhatsApp CTA button",
+        HttpStatus.INTERNAL_SERVER_ERROR
       );
     }
   }

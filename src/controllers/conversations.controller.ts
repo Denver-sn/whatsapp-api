@@ -13,13 +13,11 @@ import {
   ApiResponse,
   ApiParam,
   ApiBody,
-  ApiProperty,
 } from "@nestjs/swagger";
 import { ConversationsService } from "../services/conversations.service";
 import {
   ConversationResponse,
   MessageDto,
-  ContactDto,
   CreateConversationDto,
 } from "../models/conversation.model";
 

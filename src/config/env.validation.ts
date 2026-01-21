@@ -4,31 +4,35 @@ import { IsString, IsNotEmpty, IsOptional, IsPort, validateSync } from 'class-va
 class EnvironmentVariables {
   @IsString()
   @IsNotEmpty()
-  WHATSAPP_ACCESS_TOKEN: string;
+  WHATSAPP_ACCESS_TOKEN!: string;
 
   @IsString()
   @IsNotEmpty()
-  WHATSAPP_PHONE_NUMBER_ID: string;
+  WHATSAPP_PHONE_NUMBER_ID!: string;
 
   @IsString()
   @IsNotEmpty()
-  WHATSAPP_WEBHOOK_VERIFY_TOKEN: string;
+  WHATSAPP_WEBHOOK_VERIFY_TOKEN!: string;
 
   @IsString()
   @IsOptional()
-  WHATSAPP_API_VERSION: string = 'v18.0';
+  WHATSAPP_APP_SECRET?: string;
+
+  @IsString()
+  @IsOptional()
+  WHATSAPP_API_VERSION = 'v18.0';
 
   @IsPort()
   @IsOptional()
-  PORT: string = '3000';
+  PORT = '3000';
 
   @IsString()
   @IsOptional()
-  NODE_ENV: string = 'development';
+  NODE_ENV = 'development';
 
   @IsString()
   @IsOptional()
-  LOG_LEVEL: string = 'debug';
+  LOG_LEVEL = 'debug';
 }
 
 export function validate(config: Record<string, unknown>) {

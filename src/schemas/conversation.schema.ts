@@ -6,10 +6,10 @@ export type ConversationDocument = Conversation & Document;
 @Schema()
 export class Contact {
   @Prop({ required: true })
-  name: string;
+  name!: string;
 
   @Prop({ required: true })
-  phoneNumber: string;
+  phoneNumber!: string;
 
   @Prop()
   profilePicture?: string;
@@ -18,34 +18,34 @@ export class Contact {
 @Schema()
 export class Message {
   @Prop({ required: true })
-  content: string;
+  content!: string;
 
   @Prop({ required: true })
-  timestamp: string;
+  timestamp!: string;
 
   @Prop({ required: true, type: String, enum: ["incoming", "outgoing"] })
-  direction: "incoming" | "outgoing";
+  direction!: "incoming" | "outgoing";
 }
 
 @Schema({ timestamps: true })
 export class Conversation extends Document {
   @Prop({ type: Contact, required: true })
-  contact: Contact;
+  contact!: Contact;
 
   @Prop({ type: Message, required: true })
-  lastMessage: Message;
+  lastMessage!: Message;
 
   @Prop({ required: true, default: 0 })
-  unreadCount: number;
+  unreadCount!: number;
 
   @Prop({ type: [Message], default: [] })
-  messages: Message[];
+  messages!: Message[];
 
   @Prop()
-  createdAt: Date;
+  createdAt?: Date;
 
   @Prop()
-  updatedAt: Date;
+  updatedAt?: Date;
 }
 
 export const ConversationSchema = SchemaFactory.createForClass(Conversation);

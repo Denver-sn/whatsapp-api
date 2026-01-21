@@ -5,6 +5,7 @@ import { WhatsappService } from "./whatsapp.service";
 import { WebhookController } from "./webhook.controller";
 import { WebhooksModule } from "../webhooks/webhooks.module";
 import { ConversationsModule } from "../conversations/conversations.module";
+import { MessageStatusModule } from "../message-status/message-status.module";
 
 @Module({
   imports: [
@@ -14,6 +15,7 @@ import { ConversationsModule } from "../conversations/conversations.module";
     }),
     WebhooksModule,
     forwardRef(() => ConversationsModule),
+    MessageStatusModule,
   ],
   controllers: [WhatsappController, WebhookController],
   providers: [WhatsappService],

@@ -8,7 +8,7 @@ export class SendOtpMessageDto {
   })
   @IsString()
   @IsNotEmpty()
-  to: string;
+  to!: string;
 
   @ApiProperty({
     description: "OTP code to send",
@@ -16,5 +16,5 @@ export class SendOtpMessageDto {
   })
   @IsString()
   @IsNotEmpty()
-  otp: string;
+  otp!: string;
 }

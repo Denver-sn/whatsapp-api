@@ -24,6 +24,21 @@ export interface WhatsappMessage {
     name: string;
     wa_id: string;
   };
+  // Media fields (optional, based on message type)
+  media?: {
+    id?: string;
+    mimeType?: string;
+    sha256?: string;
+    caption?: string;
+    filename?: string;
+  };
+}
+
+export interface MediaPayload {
+  link?: string;
+  id?: string;
+  caption?: string;
+  filename?: string;
 }
 
 export interface WebhookEntry {
@@ -56,6 +71,43 @@ export interface WebhookValue {
       body: string;
     };
     type: string;
+    // Media message fields
+    image?: {
+      id: string;
+      mime_type: string;
+      sha256: string;
+      caption?: string;
+    };
+    video?: {
+      id: string;
+      mime_type: string;
+      sha256: string;
+      caption?: string;
+    };
+    audio?: {
+      id: string;
+      mime_type: string;
+      sha256: string;
+    };
+    document?: {
+      id: string;
+      mime_type: string;
+      sha256: string;
+      filename?: string;
+      caption?: string;
+    };
+    sticker?: {
+      id: string;
+      mime_type: string;
+      sha256: string;
+    };
+    // Location message
+    location?: {
+      latitude: number;
+      longitude: number;
+      name?: string;
+      address?: string;
+    };
   }>;
   statuses?: Array<{
     id: string;

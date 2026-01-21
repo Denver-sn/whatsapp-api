@@ -8,7 +8,7 @@ export class SendTemplateMessageDto {
   })
   @IsString()
   @IsNotEmpty()
-  to: string;
+  to!: string;
 
   @ApiProperty({
     description: 'Template name',
@@ -16,7 +16,7 @@ export class SendTemplateMessageDto {
   })
   @IsString()
   @IsNotEmpty()
-  templateName: string;
+  templateName!: string;
 
   @ApiProperty({
     description: 'Language code for the template',

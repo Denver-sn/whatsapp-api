@@ -17,14 +17,14 @@ export class SendMessageDto {
   })
   @IsString()
   @IsNotEmpty()
-  to: string;
+  to!: string;
 
   @ApiProperty({
     description: 'Message content (can be string for text or object for other types)',
     example: 'Hello, this is a test message!',
   })
   @IsNotEmpty()
-  message: string | object;
+  message!: string | object;
 
   @ApiProperty({
     description: 'Type of message',
